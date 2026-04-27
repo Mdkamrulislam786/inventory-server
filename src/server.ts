@@ -1,23 +1,35 @@
-import express, { Application, Request, Response } from 'express';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
+import app from "./app";
+import connectDB from "./config/database";
 
+// 1. Load environment variables
 dotenv.config();
 
-const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(express.json());
+// 2. Connect to Database & Start Server
+const startServer = async () => {
+  try {
+    await connectDB();
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URI!)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('DB Connection Error:', err));
+    const server = app.listen(PORT, () => {
+      console.log(
+        `🚀 Pharmacy Inventory Backend running on http://localhost:${PORT}`,
+      );
+    });
 
-app.get('/', (req: Request, res: Response) => {
-  res.send('API is running on Mac Mini M4!');
-});
+    // 3. Handle Graceful Shutdown (The "Senior" Touch)
+    process.on("SIGTERM", () => {
+      console.log("SIGTERM signal received: closing HTTP server");
+      server.close(() => {
+        console.log("HTTP server closed");
+        process.exit(0);
+      });
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
+};
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+startServer();
