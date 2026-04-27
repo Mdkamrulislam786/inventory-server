@@ -18,7 +18,7 @@ const startServer = async () => {
       );
     });
 
-    // 3. Handle Graceful Shutdown (The "Senior" Touch)
+    // 3. Handle Graceful Shutdown
     process.on("SIGTERM", () => {
       console.log("SIGTERM signal received: closing HTTP server");
       server.close(() => {
