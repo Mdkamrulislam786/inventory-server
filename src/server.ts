@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import app from "./app";
 import connectDB from "./config/database";
+import { initNotificationScheduler } from "./modules/notifications/application/scheduler";
 
 // 1. Load environment variables
 dotenv.config();
@@ -26,6 +27,9 @@ const startServer = async () => {
         process.exit(0);
       });
     });
+
+    // Start the 10 AM Cron Job
+    initNotificationScheduler();
   } catch (error) {
     console.error("❌ Failed to start server:", error);
     process.exit(1);

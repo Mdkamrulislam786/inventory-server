@@ -10,4 +10,5 @@ export interface IUser extends Document {
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
+  fcmToken: { type: String };
 }
