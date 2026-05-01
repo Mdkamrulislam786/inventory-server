@@ -5,6 +5,10 @@ import helmet from 'helmet';
 import userRoutes from "./modules/user/presentation/user.routes";
 import inventoryRoutes from "./modules/inventory/presentation/inventory.routes";
 import catalogRoutes from "./modules/catalog/presentation/catalog.routes";
+import analyticsRoutes from "./modules/analytics/presentation/analytics.routes";
+import salesRoutes from "./modules/sales/presentation/sale.routes";
+import procurementRoutes from "./modules/procurement/presentation/procurement.routes";
+
 
 const app: Application = express();
 // GLOBAL MIDDLEWARES HANDLING
@@ -20,7 +24,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/catalog", catalogRoutes);
-
+app.use("/api/v1/analytics", analyticsRoutes);
+app.use("/api/v1/sales", salesRoutes);
+app.use("/api/v1/procurement", procurementRoutes);
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "UP", timestamp: new Date().toISOString() });
 });

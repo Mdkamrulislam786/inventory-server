@@ -1,60 +1,72 @@
-import { Types } from 'mongoose';
-import { BatchModel, TransactionModel } from '../infrastructure/inventory.model';
-import { ApiError } from '../../../core/errors/api-error';
-import { MedicineModel } from '../../catalog/infrastructure/catalog.model';
+import { Types, ClientSession } from "mongoose";
+import {
+  BatchModel,
+  TransactionModel,
+} from "../infrastructure/inventory.model";
+import { ApiError } from "../../../core/errors/api-error";
+import { MedicineModel } from "../../catalog/infrastructure/catalog.model";
+import { SupplierModel } from "../../procurement/infrastructure/procurement.model";
+import { StockInDTO } from "../domain/inventory.entity";
 
-interface StockInDTO {
-  medicineId: string;
-  batchNumber: string;
-  expiryDate: Date;
-  purchasePrice: number; // Price per Box
-  mrp: number;           // Price per Base Unit (e.g., per tablet)
-  boxesReceived?: number;
-  manualTotalQuantity?: number;
-}
 /**
  * Admin: Add new stock (Stock-In)
  */
 export const stockIn = async (userId: string, data: StockInDTO) => {
   const medicine = await MedicineModel.findById(data.medicineId);
-  if (!medicine) throw new ApiError(404, 'Medicine not found in catalog');
+  if (!medicine) throw new ApiError(404, "Medicine not found in catalog");
 
   let finalBaseQuantity: number;
+  const unitsPerStrip = medicine.packaging.unitsPerStrip || 1;
+  const stripsPerBox = medicine.packaging.stripsPerBox || 1;
+  const totalUnitsInBox = unitsPerStrip * stripsPerBox;
 
-  // Logic: Manual override takes priority, otherwise calculate from boxes
+  // 1. Calculate Quantity
   if (data.manualTotalQuantity) {
     finalBaseQuantity = data.manualTotalQuantity;
-  } else if (data.boxesReceived && medicine.packaging) {
-    const unitsPerStrip = medicine.packaging.unitsPerStrip || 1;
-    const stripsPerBox = medicine.packaging.stripsPerBox || 1;
-    
-    // Formula: Total Tablets = Boxes * StripsPerBox * UnitsPerStrip
-    finalBaseQuantity = data.boxesReceived * stripsPerBox * unitsPerStrip;
+  } else if (data.boxesReceived) {
+    finalBaseQuantity = data.boxesReceived * totalUnitsInBox;
   } else {
-    throw new ApiError(400, 'Either boxesReceived or manualTotalQuantity must be provided');
+    throw new ApiError(400, "Provide boxesReceived or manualTotalQuantity");
   }
 
-  // Calculate purchase price per unit for profit tracking
-  // If they bought a box for 100 BDT and it has 100 tablets, costPerUnit is 1 BDT
-  const totalUnitsInBox = (medicine.packaging.stripsPerBox || 1) * (medicine.packaging.unitsPerStrip || 1);
-  const costPerUnit = data.purchasePrice / totalUnitsInBox;
+  // 2. Financial Logic: costPerUnit
+  // If manual, we assume purchasePrice is for the whole manual lot.
+  // If boxes, it's price per box.
+  const costPerUnit = data.manualTotalQuantity
+    ? data.purchasePrice / data.manualTotalQuantity
+    : data.purchasePrice / totalUnitsInBox;
+
+  const totalInvoiceValue = data.manualTotalQuantity
+    ? data.purchasePrice
+    : data.purchasePrice * (data.boxesReceived || 0);
+
+  // 3. Database Updates (Session recommended here for production)
+  if (data.supplierId) {
+    await SupplierModel.findByIdAndUpdate(data.supplierId, {
+      $inc: { totalOutstanding: totalInvoiceValue },
+    });
+  }
 
   const batch = await BatchModel.create({
     medicineId: new Types.ObjectId(data.medicineId),
     batchNumber: data.batchNumber,
     expiryDate: data.expiryDate,
     quantity: finalBaseQuantity,
-    purchasePrice: costPerUnit, // We store the unit cost for easier math later
-    mrp: data.mrp
+    purchasePrice: costPerUnit,
+    companyMrp: data.companyMrp,
+    storePrice: data.storePrice,
+    supplierId: data.supplierId
+      ? new Types.ObjectId(data.supplierId)
+      : undefined, // Added this!
   });
 
   await TransactionModel.create({
     medicineId: batch.medicineId,
     batchId: batch._id,
     userId: new Types.ObjectId(userId),
-    type: 'in',
+    type: "in",
     quantity: finalBaseQuantity,
-    totalPrice: data.purchasePrice * (data.boxesReceived || 1) 
+    totalPrice: totalInvoiceValue,
   });
 
   return batch;
@@ -62,14 +74,22 @@ export const stockIn = async (userId: string, data: StockInDTO) => {
 
 /**
  * Employee: Sell Medicine (Stock-Out with FEFO)
+ * Now accepts a 'session' for atomic transactions with the Sales module
  */
-export const processSale = async (userId: string, medicineId: string, quantityToSell: number) => {
-  // 1. Find all active batches for this medicine, sorted by soonest expiry
+export const processSale = async (
+  userId: string,
+  medicineId: string,
+  quantityToSell: number,
+  session?: ClientSession, // Added for Atomicity
+) => {
+  // 1. Find active batches with session lock
   const batches = await BatchModel.find({
     medicineId: new Types.ObjectId(medicineId),
     quantity: { $gt: 0 },
-    expiryDate: { $gt: new Date() }
-  }).sort({ expiryDate: 1 });
+    expiryDate: { $gt: new Date() },
+  })
+    .sort({ expiryDate: 1 })
+    .session(session || null);
 
   const totalAvailable = batches.reduce((acc, b) => acc + b.quantity, 0);
   if (totalAvailable < quantityToSell) {
@@ -77,31 +97,41 @@ export const processSale = async (userId: string, medicineId: string, quantityTo
   }
 
   let remainingToDeduct = quantityToSell;
-  const transactions = [];
+  const saleLogs = [];
 
-  // 2. Deduct from batches following FEFO
   for (const batch of batches) {
     if (remainingToDeduct <= 0) break;
 
     const deduction = Math.min(batch.quantity, remainingToDeduct);
-    
+
+    // Update batch quantity
     batch.quantity -= deduction;
-    remainingToDeduct -= deduction;
+    await batch.save({ session });
 
-    await batch.save();
-
-    // 3. Record transaction for each batch involved
-    const transaction = await TransactionModel.create({
-      medicineId: batch.medicineId,
+    // Record the store price used for this specific deduction
+    saleLogs.push({
       batchId: batch._id,
-      userId: new Types.ObjectId(userId),
-      type: 'out',
       quantity: deduction,
-      totalPrice: deduction * batch.mrp
+      priceAtSale: batch.storePrice,
     });
-    
-    transactions.push(transaction);
+
+    // Record transaction
+    await TransactionModel.create(
+      [
+        {
+          medicineId: batch.medicineId,
+          batchId: batch._id,
+          userId: new Types.ObjectId(userId),
+          type: "out",
+          quantity: deduction,
+          totalPrice: deduction * batch.storePrice,
+        },
+      ],
+      { session },
+    );
+
+    remainingToDeduct -= deduction;
   }
 
-  return transactions;
+  return saleLogs; // Return logs so the Sales Service knows the total price
 };

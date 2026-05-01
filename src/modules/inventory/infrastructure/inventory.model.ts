@@ -6,10 +6,13 @@ const batchSchema = new Schema<IBatch>({
   batchNumber: { type: String, required: true },
   expiryDate: { type: Date, required: true },
   quantity: { type: Number, required: true, min: 0 },
-  purchasePrice: { type: Number, required: true },
-  mrp: { type: Number, required: true },
-  supplierId: { type: Schema.Types.ObjectId, ref: 'Manufacturer' }
+  purchasePrice: { type: Number, required: true }, // Pharmacy cost
+  companyMrp: { type: Number, required: true },    // Printed price
+  storePrice: { type: Number, required: true },     // Admin set price
+  supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier' }
 }, { timestamps: true });
+
+batchSchema.index({ medicineId: 1, expiryDate: 1 });
 
 // FEFO Index: Find medicine, then sort by expiry
 batchSchema.index({ medicineId: 1, expiryDate: 1 });

@@ -21,7 +21,8 @@ const medicineSchema = new Schema<IMedicine>({
     hasStrips: { type: Boolean, default: false },
     unitsPerStrip: { type: Number },
     stripsPerBox: { type: Number }
-  }
+  },
+  defaultStorePrice: { type: Number, required: true }
 }, { timestamps: true });
 
 // Fuzzy Search Index (Text Index)

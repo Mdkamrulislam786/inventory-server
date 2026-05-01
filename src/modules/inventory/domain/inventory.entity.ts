@@ -10,6 +10,8 @@ export interface IBatch extends Document {
   mrp: number;           // Selling price per Base Unit
   supplierId?: Types.ObjectId;
   createdAt: Date;
+  companyMrp: number;    // Printed on box (e.g., 50 TK)
+  storePrice: number;     // Admin's price (e.g., 40 TK)
 }
 
 export interface ITransaction extends Document {
@@ -21,4 +23,16 @@ export interface ITransaction extends Document {
   quantity: number;
   totalPrice: number;     // quantity * mrp
   createdAt: Date;
+}
+
+export interface StockInDTO {
+  medicineId: string;
+  batchNumber: string;
+  expiryDate: Date;
+  purchasePrice: number; // Price per Box
+  companyMrp: number;           // Price per Base Unit (e.g., per tablet)
+  storePrice: number;
+  boxesReceived?: number;
+  manualTotalQuantity?: number;
+  supplierId?: string; // Optional, for linking to procurement
 }

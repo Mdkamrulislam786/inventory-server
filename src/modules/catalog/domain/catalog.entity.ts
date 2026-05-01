@@ -28,4 +28,5 @@ export interface IMedicine extends Document {
   packaging: IPackaging;
   createdAt: Date;
   updatedAt: Date;
+  defaultStorePrice: number
 }
