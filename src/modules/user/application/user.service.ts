@@ -10,15 +10,19 @@ import { ApiError } from '../../../core/errors/api-error';
 /**
  * Helper to handle environment variables safely for JWT
  */
-const getJwtOptions = (expiresIn: string): SignOptions => ({
-  expiresIn: expiresIn as SignOptions['expiresIn']
+const getJwtOptions = (expiresIn: string | number): SignOptions => ({
+  expiresIn: expiresIn as SignOptions["expiresIn"],
 });
 
 const signAccessToken = (id: string, role: string): string => {
-  const secret = process.env.JWT_ACCESS_SECRET;
-  if (!secret) throw new ApiError(500, 'JWT Access Secret is not defined');
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new ApiError(500, "JWT Access Secret is not defined");
 
-  return jwt.sign({ id, role }, secret, getJwtOptions('15m'));
+  return jwt.sign(
+    { id, role },
+    secret,
+    getJwtOptions(`${process.env.JWT_EXPIRES_IN}`),
+  ); //7day
 };
 
 const signToken = (id: string, role: string): string => {

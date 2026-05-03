@@ -5,7 +5,7 @@ import { ApiError } from '../errors/api-error';
 export const protect = (req: Request, res: Response, next: NextFunction) => {
   let token;
   if (req.headers.authorization?.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
+    token = req.headers.authorization.split(" ")[1];
   }
 
   if (!token) return next(new ApiError(401, 'You are not logged in'));

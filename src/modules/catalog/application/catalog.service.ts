@@ -4,15 +4,44 @@ import { ApiError } from '../../../core/errors/api-error';
 import { IMedicine } from '../domain/catalog.entity';
 
 export const createMedicine = async (data: Partial<IMedicine>) => {
+  const existingMedicine = await MedicineModel.findOne({
+    brandName: data.brandName,
+    genericName: data.genericName,
+  });
+  if (existingMedicine) {
+    throw new ApiError(
+      409,
+      `Medicine with brand name '${data.brandName}' and generic name '${data.genericName}' already exists`,
+    );
+  }
   return await MedicineModel.create(data);
 };
 
 export const createManufacturer = async (name: string, code: string) => {
+  const existingManufacturer = await ManufacturerModel.findOne({
+    name,
+    code,
+  });
+  if (existingManufacturer) {
+    throw new ApiError(
+      409,
+      `Manufacturer with name '${name}' and code '${code}' already exists`,
+    );
+  }
   return await ManufacturerModel.create({ name, code });
 };
 
-export const createShelf = async (tag: string, description?: string) => {
-  return await ShelfModel.create({ shelfTag: tag.toUpperCase(), description });
+export const createShelf = async (shelfTag: string, description?: string) => {
+  const existingShelf = await ShelfModel.findOne({
+    shelfTag: shelfTag.toUpperCase(),
+  });
+  if (existingShelf) {
+    throw new ApiError(409, `Shelf tag '${shelfTag}' already exists`);
+  }
+  return await ShelfModel.create({
+    shelfTag: shelfTag.toUpperCase(),
+    description,
+  });
 };
 
 /**
