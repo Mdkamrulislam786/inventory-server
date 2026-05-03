@@ -12,8 +12,6 @@ const batchSchema = new Schema<IBatch>({
   supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier' }
 }, { timestamps: true });
 
-batchSchema.index({ medicineId: 1, expiryDate: 1 });
-
 // FEFO Index: Find medicine, then sort by expiry
 batchSchema.index({ medicineId: 1, expiryDate: 1 });
 
