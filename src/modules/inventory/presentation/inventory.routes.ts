@@ -9,5 +9,6 @@ router.post('/stock-in', protect, restrictTo('admin'), InventoryController.addSt
 
 // Both can process sales, but usually, this is the employee's main task
 router.post('/sell', protect, InventoryController.sellItems);
+router.get("/status/:medicineId", protect, InventoryController.getStockStatus);
 
 export default router;

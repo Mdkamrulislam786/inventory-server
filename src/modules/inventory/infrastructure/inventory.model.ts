@@ -5,10 +5,11 @@ const batchSchema = new Schema<IBatch>({
   medicineId: { type: Schema.Types.ObjectId, ref: 'Medicine', required: true },
   batchNumber: { type: String, required: true },
   expiryDate: { type: Date, required: true },
-  quantity: { type: Number, required: true, min: 0 },
-  purchasePrice: { type: Number, required: true }, // Pharmacy cost
-  companyMrp: { type: Number, required: true },    // Printed price
-  storePrice: { type: Number, required: true },     // Admin set price
+  quantity: { type: Number, required: true },       // Total Tablets/Bottles
+  purchasePrice: { type: Number, required: true },  // Cost per 1 Tablet/Bottle
+  storePrice: { type: Number, required: true },     // Sales Price per 1 Tablet/Bottle
+  companyMrp: { type: Number },
+  unitsPerPackage: { type: Number, default: 1 },    // e.g., 10 (tablets per strip)
   supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier' }
 }, { timestamps: true });
 

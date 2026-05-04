@@ -24,9 +24,20 @@ export interface IMedicine extends Document {
   genericName: string;
   manufacturerId: Types.ObjectId;
   shelfId: Types.ObjectId;
-  baseUnit: string;        // e.g., "tablet", "ml", "vial"
+  baseUnit: BaseUnit;
   packaging: IPackaging;
   createdAt: Date;
   updatedAt: Date;
   defaultStorePrice: number
 }
+
+export enum BaseUnit {
+  TABLET = 'tablet',
+  CAPSULE = 'capsule',
+  SYRUP = 'syrup',
+  INJECTION = 'injection',
+  OINTMENT = 'ointment',
+  OTHER = 'other'
+}
+
+// baseUnit: BaseUnit;
