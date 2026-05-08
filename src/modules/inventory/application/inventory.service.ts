@@ -236,8 +236,8 @@ export const getPaginatedStockList = async (
   const totalDocs = aggregateResult[0].metadata[0]?.total || 0;
 
   return {
-    docs,
-    totalDocs,
+    data: docs,
+    total: totalDocs,
     limit,
     page,
     totalPages: Math.ceil(totalDocs / limit),

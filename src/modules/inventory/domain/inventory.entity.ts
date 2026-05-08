@@ -66,8 +66,8 @@ export interface StockListResponse {
 }
 
 export interface PaginatedResult<T> {
-  docs: T[];
-  totalDocs: number;
+  data: T[];
+  total: number;
   limit: number;
   page: number;
   totalPages: number;
