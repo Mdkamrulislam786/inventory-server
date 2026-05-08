@@ -1,4 +1,5 @@
 import { Document, Types } from 'mongoose';
+import { BaseUnit } from '../../catalog/domain/catalog.entity';
 
 export interface IBatch extends Document {
   _id: Types.ObjectId;
@@ -40,4 +41,34 @@ export interface StockInDTO {
   totalPurchasePrice: number; // The TOTAL money paid for this specific entry
   companyMrp: number; // Per smallest unit or per strip (usually per strip/bottle)
   storePrice: number; // Admin's selling price per smallest unit
+}
+
+// for medicine list display with pagination
+export interface StockListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export interface StockListResponse {
+  id: string;
+  brandName: string;
+  genericName: string;
+  baseUnit: BaseUnit;
+  shelf: {
+    tag: string;
+    location: string;
+  };
+  totalStock: number;
+  displayPrice: number;
+  priceUnit: string;
+  activeBatches: string[];
+}
+
+export interface PaginatedResult<T> {
+  docs: T[];
+  totalDocs: number;
+  limit: number;
+  page: number;
+  totalPages: number;
 }

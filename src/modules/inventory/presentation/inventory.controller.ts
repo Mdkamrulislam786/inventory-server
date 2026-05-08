@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as InventoryService from "../application/inventory.service";
+import { StockListQuery } from "../domain/inventory.entity";
 
 export const addStock = async (
   req: Request,
@@ -43,6 +44,25 @@ export const getStockStatus = async (
       req.params.medicineId as string,
     );
     res.status(200).json({ status: "success", data: status });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStockList = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query: StockListQuery = {
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      search: req.query.search as string
+    };
+
+    const results = await InventoryService.getPaginatedStockList(query);
+
+    res.status(200).json({
+      status: 'success',
+      ...results
+    });
   } catch (err) {
     next(err);
   }
