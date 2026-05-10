@@ -49,19 +49,53 @@ export const getStockStatus = async (
   }
 };
 
-export const getStockList = async (req: Request, res: Response, next: NextFunction) => {
+export const getStockList = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const query: StockListQuery = {
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
-      search: req.query.search as string
+      search: req.query.search as string,
     };
 
     const results = await InventoryService.getPaginatedStockList(query);
 
     res.status(200).json({
-      status: 'success',
-      ...results
+      status: "success",
+      ...results,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getSearchForSale = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const searchQuery = req.query.q as string;
+
+    // 1. Guard against empty search
+    if (!searchQuery) {
+      return res.status(200).json({
+        status: "success",
+        data: [],
+      });
+    }
+
+    // 2. Call the service (which handles the comma splitting and batch aggregation)
+    const results = await InventoryService.searchMedicinesForSale(searchQuery);
+
+    // 3. Return results for the frontend "Add to Tray" list
+    res.status(200).json({
+      status: "success",
+      count: results.length,
+      data: results,
     });
   } catch (err) {
     next(err);

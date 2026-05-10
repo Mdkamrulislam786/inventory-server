@@ -3,7 +3,7 @@ import * as SaleService from '../application/sale.service';
 
 export const checkout = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const sale = await SaleService.executeCheckout(req.user.id, req.body);
+    const sale = await SaleService.checkout(req.user.id, req.body);
     res.status(201).json({ status: 'success', data: sale });
   } catch (err) { next(err); }
 };

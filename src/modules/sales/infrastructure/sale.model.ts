@@ -1,18 +1,17 @@
 import { Schema, model } from 'mongoose';
-import { ISale } from '../domain/sale.entity';
 
-const saleSchema = new Schema<ISale>({
+const saleSchema = new Schema({
+  employeeId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  customerName: { type: String, default: 'Walking Customer' },
   items: [{
-    medicineId: { type: Schema.Types.ObjectId, ref: 'Medicine', required: true },
-    quantity: { type: Number, required: true },
-    unitPrice: { type: Number, required: true },
-    subtotal: { type: Number, required: true }
+    medicineId: { type: Schema.Types.ObjectId, ref: 'Medicine' },
+    brandName: String,
+    quantity: Number,
+    soldPrice: Number, // The total price for the quantity
+    isManualPrice: { type: Boolean, default: false }
   }],
   totalAmount: { type: Number, required: true },
-  discountTk: { type: Number, default: 0 },
-  reason: { type: String },
-  finalAmount: { type: Number, required: true },
-  soldBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+  saleDate: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-export const SaleModel = model<ISale>('Sale', saleSchema);
+export const SaleModel = model('Sale', saleSchema);

@@ -18,6 +18,7 @@ export interface IBatch extends Document {
 
 export interface ITransaction extends Document {
   _id: Types.ObjectId;
+  saleId?: Types.ObjectId; // Optional reference to Sale (only for 'out' type)
   medicineId: Types.ObjectId;
   batchId: Types.ObjectId;
   userId: Types.ObjectId; // Who performed the action

@@ -11,5 +11,6 @@ router.post('/stock-in', protect, restrictTo('admin'), InventoryController.addSt
 router.post('/sell', protect, InventoryController.sellItems);
 router.get("/status/:medicineId", protect, InventoryController.getStockStatus);
 router.get("/list", protect, InventoryController.getStockList);
+router.get("/search", protect, InventoryController.getSearchForSale);
 
 export default router;

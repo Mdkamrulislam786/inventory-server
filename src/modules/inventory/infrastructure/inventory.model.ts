@@ -17,6 +17,7 @@ const batchSchema = new Schema<IBatch>({
 batchSchema.index({ medicineId: 1, expiryDate: 1 });
 
 const transactionSchema = new Schema<ITransaction>({
+  saleId: { type: Schema.Types.ObjectId, ref: 'Sale', default: null },
   medicineId: { type: Schema.Types.ObjectId, ref: 'Medicine', required: true },
   batchId: { type: Schema.Types.ObjectId, ref: 'Batch', required: true },
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },

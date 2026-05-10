@@ -243,3 +243,116 @@ export const getPaginatedStockList = async (
     totalPages: Math.ceil(totalDocs / limit),
   };
 };
+
+
+export const deductStockFEFO = async (
+  medicineId: string, 
+  requestedQty: number, 
+  saleId: string, 
+  userId: string, 
+  manualPrice?: number
+) => {
+  const medicine = await MedicineModel.findById(medicineId);
+  if (!medicine) throw new Error("Medicine not found");
+
+  const batches = await BatchModel.find({
+    medicineId,
+    quantity: { $gt: 0 },
+    expiryDate: { $gt: new Date() }
+  }).sort({ expiryDate: 1 });
+
+  const available = batches.reduce((acc, b) => acc + b.quantity, 0);
+  if (available < requestedQty) throw new Error(`Stock out: ${medicine.brandName}`);
+
+  let remaining = requestedQty;
+  let systemTotalPrice = 0;
+  const batchesAffected = [];
+
+  for (const batch of batches) {
+    if (remaining <= 0) break;
+    const take = Math.min(batch.quantity, remaining);
+    
+    // 1. Update Batch Quantity
+    batch.quantity -= take;
+    await batch.save();
+
+    // 2. Calculate Price for this specific movement
+    // Logic: If manualPrice exists for the whole item, we distribute it proportionally to the batch quantity
+    const batchCalculatedPrice = manualPrice 
+      ? (manualPrice * (take / requestedQty)) 
+      : (take * batch.storePrice);
+
+    systemTotalPrice += (take * batch.storePrice);
+
+    // 3. INTERNAL ENCAPSULATION: Create the Transaction record here
+    await TransactionModel.create({
+      saleId,
+      medicineId,
+      batchId: batch._id,
+      userId, // The employee making the sale
+      type: 'out',
+      quantity: take,
+      totalPrice: batchCalculatedPrice
+    });
+
+    batchesAffected.push({ batchId: batch._id, quantity: take });
+    remaining -= take;
+  }
+
+  return {
+    brandName: medicine.brandName,
+    systemTotalPrice, // Still returning this so Sales can compare if needed
+  };
+};
+
+export const searchMedicinesForSale = async (searchQuery: string) => {
+  const terms = searchQuery.split(',').map(t => t.trim()).filter(t => t !== "");
+  
+  // Build OR conditions for every term provided
+  const orConditions = terms.map(term => ({
+    $or: [
+      { brandName: { $regex: term, $options: 'i' } },
+      { genericName: { $regex: term, $options: 'i' } }
+    ]
+  }));
+
+  // Find medicines matching any of the terms
+  const medicines = await MedicineModel.find({ $or: orConditions })
+    .populate('shelfId')
+    .lean();
+
+  const results = [];
+
+  for (const med of medicines) {
+    // Get stock and price from active batches
+    const batches = await BatchModel.find({
+      medicineId: med._id,
+      quantity: { $gt: 0 },
+      expiryDate: { $gt: new Date() }
+    }).sort({ expiryDate: 1 });
+
+    const totalStock = batches.reduce((acc, b) => acc + b.quantity, 0);
+    const firstBatch = batches[0];
+
+    let displayPrice = 0;
+    if (firstBatch) {
+      displayPrice = [BaseUnit.TABLET, BaseUnit.CAPSULE].includes(med.baseUnit as BaseUnit)
+        ? firstBatch.storePrice * firstBatch.unitsPerPackage
+        : firstBatch.storePrice;
+    }
+
+    results.push({
+      id: med._id,
+      brandName: med.brandName,
+      genericName: med.genericName,
+      baseUnit: med.baseUnit,
+      shelf: med.shelfId ? (med.shelfId as any).shelfTag : 'N/A',
+      location: med.shelfId ? (med.shelfId as any).description : 'N/A',
+      totalStock,
+      displayPrice, // Price per strip or per piece
+      priceUnit: [BaseUnit.TABLET, BaseUnit.CAPSULE].includes(med.baseUnit as BaseUnit) ? 'strip' : 'piece'
+    });
+  }
+
+  return results;
+};
