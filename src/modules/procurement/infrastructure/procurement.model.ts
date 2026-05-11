@@ -12,7 +12,7 @@ const supplierPaymentSchema = new Schema<ISupplierPayment>({
   supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier', required: true },
   amountPaid: { type: Number, required: true },
   paymentDate: { type: Date, default: Date.now },
-  paymentMethod: { type: String, enum: ['cash', 'bank_transfer', 'cheque'], required: true },
+  paymentMethod: { type: String, enum: ['cash', 'bank_transfer', 'cheque', 'bkash'], required: true },
   note: String
 });
 

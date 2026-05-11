@@ -47,17 +47,31 @@ export const stockIn = async (userId: string, data: StockInDTO) => {
     });
   }
 
-  // 3. Create Batch
-  const batch = await BatchModel.create({
+  let batch = await BatchModel.findOne({
     medicineId: medicine._id,
     batchNumber: data.batchNumber,
-    expiryDate: data.expiryDate,
-    quantity: totalSmallestUnits,
-    purchasePrice: costPerSmallestUnit,
-    storePrice: salePricePerSmallestUnit,
-    unitsPerPackage: tabletsPerStrip, // Save this for search display logic!
-    supplierId: data.supplierId,
   });
+
+  if (batch) {
+    // UPDATE EXISTING: Increment quantity and update to latest pricing
+    batch.quantity += totalSmallestUnits;
+    batch.purchasePrice = costPerSmallestUnit;
+    batch.storePrice = salePricePerSmallestUnit;
+    batch.expiryDate = data.expiryDate; // Just in case the date was entered wrong before
+    await batch.save();
+  } else {
+    // 3. Create Batch
+    batch = await BatchModel.create({
+      medicineId: medicine._id,
+      batchNumber: data.batchNumber,
+      expiryDate: data.expiryDate,
+      quantity: totalSmallestUnits,
+      purchasePrice: costPerSmallestUnit,
+      storePrice: salePricePerSmallestUnit,
+      unitsPerPackage: tabletsPerStrip, // Save this for search display logic!
+      supplierId: data.supplierId,
+    });
+  }
 
   // 5. Transaction Log
   await TransactionModel.create({
