@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as ProcurementService from '../application/procurement.service';
+import { ISupplierPayment } from "../domain/procurement.entity";
 
 export const createSupplier = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -15,12 +16,13 @@ export const createSupplier = async (req: Request, res: Response, next: NextFunc
 
 export const paySupplier = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { supplierId, amount, method } = req.body as { 
-      supplierId: string; 
-      amount: number; 
-      method: string 
-    };
-    const result = await ProcurementService.settlePayment(supplierId, amount, method);
+    const { supplierId, amountPaid, paymentMethod } =
+      req.body as Partial<ISupplierPayment>;
+    const result = await ProcurementService.settlePayment(
+      supplierId!,
+      amountPaid!,
+      paymentMethod!,
+    );
     res.status(200).json({ status: 'success', data: result });
   } catch (err) { 
     next(err); 

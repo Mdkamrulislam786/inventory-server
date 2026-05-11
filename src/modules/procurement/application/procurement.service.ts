@@ -27,20 +27,20 @@ export const registerSupplier = async (
  * Record a payment made to a supplier
  */
 export const settlePayment = async (
-  supplierId: string,
-  amount: number,
-  method: string,
+  supplierId: Types.ObjectId,
+  amountPaid: number,
+  paymentMethod: string,
 ) => {
   const supplier = await SupplierModel.findById(supplierId);
   if (!supplier) throw new ApiError(404, "Supplier not found");
 
   const payment = await SupplierPaymentModel.create({
-    supplierId: new Types.ObjectId(supplierId),
-    amountPaid: amount,
-    paymentMethod: method,
+    supplierId,
+    amountPaid,
+    paymentMethod,
   });
 
-  supplier.totalOutstanding -= amount;
+  supplier.totalOutstanding -= amountPaid;
   await supplier.save();
 
   return { payment, remainingBalance: supplier.totalOutstanding };
