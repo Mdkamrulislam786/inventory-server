@@ -26,3 +26,47 @@ export const getStockAlerts = async (req: Request, res: Response, next: NextFunc
     res.status(200).json({ status: 'success', data: stock });
   } catch (err) { next(err); }
 };
+
+export const getFinancialStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Default to today (start of day to end of day)
+    const start = req.query.startDate ? new Date(req.query.startDate as string) : new Date();
+    start.setHours(0, 0, 0, 0);
+    
+    const end = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const data = await AnalyticsService.getFinancialSummary(start, end);
+    res.status(200).json({ status: 'success', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getTopSelling = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 5;
+    const data = await AnalyticsService.getTopSellingMedicines(limit);
+    res.status(200).json({ status: 'success', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getEmployeeStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await AnalyticsService.getEmployeePerformance();
+    res.status(200).json({ status: 'success', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getDebtSummary = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await AnalyticsService.getSupplierDebtSummary();
+    res.status(200).json({ status: 'success', data });
+  } catch (err) {
+    next(err);
+  }
+};

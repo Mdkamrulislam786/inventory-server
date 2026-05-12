@@ -1,8 +1,7 @@
 import { TransactionModel, BatchModel } from '../../inventory/infrastructure/inventory.model';
-/**
- * DAILY PROFIT & LOSS
- * Matches today's sales and joins with Batches to find the original purchase cost.
- */
+import { SaleModel } from '../../sales/infrastructure/sale.model';
+import { SupplierModel } from '../../procurement/infrastructure/procurement.model';
+
 export const getDailyProfit = async (date: Date) => {
   const startOfDay = new Date(date.setHours(0, 0, 0, 0));
   const endOfDay = new Date(date.setHours(23, 59, 59, 999));
@@ -42,10 +41,6 @@ export const getDailyProfit = async (date: Date) => {
   ]);
 };
 
-/**
- * EXPIRY ALERTS
- * Finds batches expiring within the next 'days' (default 30)
- */
 export const getExpiryAlerts = async (days: number = 30) => {
   const thresholdDate = new Date();
   thresholdDate.setDate(thresholdDate.getDate() + days);
@@ -62,10 +57,6 @@ export const getExpiryAlerts = async (days: number = 30) => {
   .lean();
 };
 
-/**
- * LOW STOCK ALERT
- * Groups all batches by medicine and sums the total quantity.
- */
 export const getLowStockAlerts = async (threshold: number = 50) => {
   return await BatchModel.aggregate([
     { $group: { _id: '$medicineId', totalQty: { $sum: '$quantity' } } },
@@ -87,4 +78,120 @@ export const getLowStockAlerts = async (threshold: number = 50) => {
       }
     }
   ]);
+};
+
+export const getFinancialSummary = async (startDate: Date, endDate: Date) => {
+  // 1. Calculate Total Revenue from Sales
+  const revenueData = await SaleModel.aggregate([
+    { $match: { createdAt: { $gte: startDate, $lte: endDate } } },
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: "$totalAmount" },
+        saleCount: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // 2. Calculate COGS (Cost of Goods Sold) from Transactions
+  // We look at 'out' transactions linked to sales within this period
+  const cogsData = await TransactionModel.aggregate([
+    { $match: { 
+        type: 'out', 
+        saleId: { $ne: null },
+        createdAt: { $gte: startDate, $lte: endDate } 
+    } },
+    {
+      $group: {
+        _id: null,
+        totalCost: { $sum: "$totalPrice" }
+      }
+    }
+  ]);
+
+  const revenue = revenueData[0]?.totalRevenue || 0;
+  const cogs = cogsData[0]?.totalCost || 0;
+
+  return {
+    revenue,
+    cogs,
+    netProfit: revenue - cogs,
+    saleCount: revenueData[0]?.saleCount || 0,
+    period: { start: startDate, end: endDate }
+  };
+};
+
+export const getTopSellingMedicines = async (limit: number = 5) => {
+  return await SaleModel.aggregate([
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: "$items.medicineId",
+        totalSold: { $sum: "$items.quantity" },
+        revenueGenerated: { $sum: "$items.soldPrice" }
+      }
+    },
+    { $sort: { totalSold: -1 } },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'medicines',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'details'
+      }
+    },
+    { $unwind: "$details" },
+    {
+      $project: {
+        brandName: "$details.brandName",
+        totalSold: 1,
+        revenueGenerated: 1
+      }
+    }
+  ]);
+};
+
+export const getEmployeePerformance = async () => {
+  return await SaleModel.aggregate([
+    {
+      $group: {
+        _id: "$employeeId",
+        totalSales: { $sum: "$totalAmount" },
+        transactionCount: { $sum: 1 }
+      }
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'employee'
+      }
+    },
+    { $unwind: "$employee" },
+    {
+      $project: {
+        name: "$employee.name",
+        totalSales: 1,
+        transactionCount: 1,
+        averageSaleValue: { $divide: ["$totalSales", "$transactionCount"] }
+      }
+    },
+    { $sort: { totalSales: -1 } }
+  ]);
+};
+
+export const getSupplierDebtSummary = async () => {
+  const stats = await SupplierModel.aggregate([
+    {
+      $group: {
+        _id: null,
+        totalOutstanding: { $sum: "$totalOutstanding" },
+        supplierCount: { $sum: 1 }
+      }
+    }
+  ]);
+  
+  return stats[0] || { totalOutstanding: 0, supplierCount: 0 };
 };
