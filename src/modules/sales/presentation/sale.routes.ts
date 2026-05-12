@@ -5,6 +5,7 @@ import { protect, restrictTo } from '../../../core/middleware/auth.middleware';
 const router = Router();
 
 router.post('/checkout', protect, SaleController.checkout);
-router.get('/report', protect, restrictTo('admin'), SaleController.getHistory);
+router.get('/history', protect, restrictTo('admin'), SaleController.getSalesHistory); // Broad history
+router.get('/:id', protect, SaleController.getSaleDetail); // Specific invoice
 
 export default router;

@@ -1,20 +1,39 @@
 import { Request, Response, NextFunction } from 'express';
-import * as SaleService from '../application/sale.service';
+import * as SalesService from "../application/sale.service";
 
 export const checkout = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const sale = await SaleService.checkout(req.user.id, req.body);
+    const sale = await SalesService.checkout(req.user.id, req.body);
     res.status(201).json({ status: 'success', data: sale });
   } catch (err) { next(err); }
 };
 
-export const getHistory = async (req: Request, res: Response, next: NextFunction) => {
+export const getSaleDetail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    const { start, end } = req.query;
-    const s = start ? new Date(start as string) : new Date(new Date().setHours(0,0,0,0));
-    const e = end ? new Date(end as string) : new Date(new Date().setHours(23,59,59,999));
+    const data = await SalesService.getSaleById(req.params.id as string);
+    res.status(200).json({ status: "success", data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    const history = await SaleService.getSalesList(s, e);
-    res.status(200).json({ status: 'success', data: history });
-  } catch (err) { next(err); }
+export const getSalesHistory = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { startDate, endDate, employeeId } = req.query;
+
+    const filters = {
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      employeeId: employeeId as string,
+    };
+
+    const data = await SalesService.getSalesHistory(filters);
+    res.status(200).json({ status: "success", data });
+  } catch (err) {
+    next(err);
+  }
 };

@@ -57,21 +57,29 @@ export const getSalesList = async (startDate: Date, endDate: Date) => {
     .lean();
 };
 
-export const getSalesHistory = async (query: {
+// Fetch filtered history (Admin or Manager view)
+export const getSalesHistory = async (filters: {
+  startDate?: Date;
+  endDate?: Date;
   employeeId?: string;
-  type: "daily" | "monthly" | "all";
 }) => {
-  const filter: any = {};
-  if (query.employeeId) filter.employeeId = query.employeeId;
+  const query: any = {};
 
-  const now = new Date();
-  if (query.type === "daily") {
-    filter.createdAt = { $gte: new Date(now.setHours(0, 0, 0, 0)) };
-  } else if (query.type === "monthly") {
-    filter.createdAt = { $gte: new Date(now.getFullYear(), now.getMonth(), 1) };
+  if (filters.startDate && filters.endDate) {
+    query.createdAt = { $gte: filters.startDate, $lte: filters.endDate };
+  }
+  if (filters.employeeId) {
+    query.employeeId = filters.employeeId;
   }
 
-  return await SaleModel.find(filter)
-    .populate("employeeId", "name")
-    .sort({ createdAt: -1 });
+  return await SaleModel.find(query)
+    .sort({ createdAt: -1 })
+    .populate("employeeId", "name");
+};
+
+// Fetch a single sale for receipt printing
+export const getSaleById = async (id: string) => {
+  const sale = await SaleModel.findById(id).populate("employeeId", "name");
+  if (!sale) throw new Error("Sale not found");
+  return sale;
 };
