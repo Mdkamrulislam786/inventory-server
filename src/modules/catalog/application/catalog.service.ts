@@ -132,8 +132,11 @@ export const matchTrayToShelf = async (shelfTag: string, trayMedicineIds: string
 
   return await MedicineModel.find({
     _id: { $in: medicineObjectIds },
-    shelfId: shelf._id
+    shelfId: shelf._id,
   })
-  .populate('manufacturerId', 'name')
-  .lean();
+    .populate([
+      { path: "manufacturerId", select: "name" },
+      { path: "shelfId", select: "shelfTag description" },
+    ])
+    .lean();
 };
