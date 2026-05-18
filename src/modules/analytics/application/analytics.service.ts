@@ -83,30 +83,54 @@ export const getLowStockAlerts = async (threshold: number = 50) => {
 export const getFinancialSummary = async (startDate: Date, endDate: Date) => {
   // 1. Calculate Total Revenue from Sales
   const revenueData = await SaleModel.aggregate([
-    { $match: { createdAt: { $gte: startDate, $lte: endDate } } },
+    {
+      $match: {
+        createdAt: { $gte: startDate, $lte: endDate },
+      },
+    },
     {
       $group: {
         _id: null,
         totalRevenue: { $sum: "$totalAmount" },
-        saleCount: { $sum: 1 }
-      }
-    }
+        saleCount: { $sum: 1 },
+      },
+    },
   ]);
 
-  // 2. Calculate COGS (Cost of Goods Sold) from Transactions
-  // We look at 'out' transactions linked to sales within this period
+  // 2. Fetch the purchasePrice from the Batches collection
   const cogsData = await TransactionModel.aggregate([
-    { $match: { 
-        type: 'out', 
-        saleId: { $ne: null },
-        createdAt: { $gte: startDate, $lte: endDate } 
-    } },
     {
+      $match: {
+        type: "out",
+        saleId: { $ne: null },
+        createdAt: { $gte: startDate, $lte: endDate },
+      },
+    },
+    {
+      // Join with the batches collection to find what you originally paid for this medicine
+      $lookup: {
+        from: "batches",
+        localField: "batchId",
+        foreignField: "_id",
+        as: "batchDetails",
+      },
+    },
+    { $unwind: "$batchDetails" },
+    {
+      // Calculate the actual cost: transaction quantity * batch wholesale cost
+      $addFields: {
+        calculatedCost: {
+          $multiply: ["$quantity", "$batchDetails.purchasePrice"],
+        },
+      },
+    },
+    {
+      // Sum the calculated wholesale costs together
       $group: {
         _id: null,
-        totalCost: { $sum: "$totalPrice" }
-      }
-    }
+        totalCost: { $sum: "$calculatedCost" },
+      },
+    },
   ]);
 
   const revenue = revenueData[0]?.totalRevenue || 0;
@@ -117,7 +141,7 @@ export const getFinancialSummary = async (startDate: Date, endDate: Date) => {
     cogs,
     netProfit: revenue - cogs,
     saleCount: revenueData[0]?.saleCount || 0,
-    period: { start: startDate, end: endDate }
+    period: { start: startDate, end: endDate },
   };
 };
 
