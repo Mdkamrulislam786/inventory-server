@@ -22,14 +22,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // DOMAIN ROUTES
 app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/catalog", catalogRoutes);
-app.use("/api/v1/analytics", analyticsRoutes);
-app.use("/api/v1/sales", salesRoutes);
 app.use("/api/v1/procurement", procurementRoutes);
-app.get("/health", (req: Request, res: Response) => {
-  res.status(200).json({ status: "UP", timestamp: new Date().toISOString() });
-});
+app.use("/api/v1/inventory", inventoryRoutes);
+app.use("/api/v1/sales", salesRoutes);
+app.use("/api/v1/analytics", analyticsRoutes);
 
 // ERROR HANDLING
 // 404 Handler
