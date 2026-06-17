@@ -1,6 +1,7 @@
 import { Schema, model } from 'mongoose';
 import bcryptjs from 'bcryptjs';
 import { IUser } from '../domain/user.entity';
+import { tenantPlugin } from "../../../core/tenant.plugin";
 
 const userSchema = new Schema<IUser>({
   name: { type: String, required: true },
@@ -22,5 +23,6 @@ userSchema.pre<IUser>('save', async function () {
   // No next() needed! The resolution of this async function 
   // tells Mongoose to proceed to the save operation.
 });
+userSchema.plugin(tenantPlugin);
 
 export const UserModel = model<IUser>('User', userSchema);

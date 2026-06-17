@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { tenantPlugin } from "../../../core/tenant.plugin";
 
 const saleSchema = new Schema({
   employeeId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -13,5 +14,7 @@ const saleSchema = new Schema({
   totalAmount: { type: Number, required: true },
   saleDate: { type: Date, default: Date.now }
 }, { timestamps: true });
+
+saleSchema.plugin(tenantPlugin);
 
 export const SaleModel = model('Sale', saleSchema);

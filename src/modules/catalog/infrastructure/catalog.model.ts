@@ -1,5 +1,6 @@
 import { Schema, model } from 'mongoose';
 import { IManufacturer, IShelf, IMedicine } from '../domain/catalog.entity';
+import { tenantPlugin } from "../../../core/tenant.plugin";
 
 const manufacturerSchema = new Schema<IManufacturer>({
   name: { type: String, required: true, unique: true, trim: true },
@@ -10,6 +11,9 @@ const shelfSchema = new Schema<IShelf>({
   shelfTag: { type: String, required: true, unique: true, uppercase: true },
   description: { type: String }
 });
+
+manufacturerSchema.plugin(tenantPlugin);
+shelfSchema.plugin(tenantPlugin);
 
 const medicineSchema = new Schema<IMedicine>({
   brandName: { type: String, required: true, index: true },
@@ -25,8 +29,8 @@ const medicineSchema = new Schema<IMedicine>({
   defaultStorePrice: { type: Number, required: true }
 }, { timestamps: true });
 
-// Fuzzy Search Index (Text Index)
 medicineSchema.index({ brandName: 'text', genericName: 'text' });
+medicineSchema.plugin(tenantPlugin);
 
 export const ManufacturerModel = model<IManufacturer>('Manufacturer', manufacturerSchema);
 export const ShelfModel = model<IShelf>('Shelf', shelfSchema);

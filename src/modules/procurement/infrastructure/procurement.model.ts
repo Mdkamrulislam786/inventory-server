@@ -1,5 +1,6 @@
 import { Schema, model } from 'mongoose';
 import { ISupplier, ISupplierPayment, IReturnToSupplier } from '../domain/procurement.entity';
+import { tenantPlugin } from "../../../core/tenant.plugin";
 
 const supplierSchema = new Schema<ISupplier>({
   name: { type: String, required: true, unique: true },
@@ -24,6 +25,10 @@ const returnSchema = new Schema<IReturnToSupplier>({
   reason: { type: String, enum: ['expired', 'damaged', 'wrong_delivery'], required: true },
   creditReceived: { type: Number, required: true }
 }, { timestamps: true });
+
+supplierSchema.plugin(tenantPlugin);
+supplierPaymentSchema.plugin(tenantPlugin);
+returnSchema.plugin(tenantPlugin);
 
 export const SupplierModel = model<ISupplier>('Supplier', supplierSchema);
 export const SupplierPaymentModel = model<ISupplierPayment>('SupplierPayment', supplierPaymentSchema);
