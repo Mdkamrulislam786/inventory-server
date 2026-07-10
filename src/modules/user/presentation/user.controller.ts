@@ -1,36 +1,103 @@
-import { Request, Response, NextFunction } from 'express';
-import * as UserService from '../application/user.service';
-import { ApiError } from '../../../core/errors/api-error';
-import { RefreshTokenModel } from '../infrastructure/refresh-token.model';
+import { Request, Response, NextFunction } from "express";
+import * as UserService from "../application/user.service";
+import { ApiError } from "../../../core/errors/api-error";
+import { RefreshTokenModel } from "../infrastructure/refresh-token.model";
 
-export const signup = async (req: Request, res: Response, next: NextFunction) => {
+export const signup = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const data = await UserService.registerUser(req.body);
-    res.status(201).json({ status: 'success', data });
-  } catch (err) { next(err); }
+    res.status(201).json({ status: "success", data });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const login = async (req: Request, res: Response, next: NextFunction) => {
+export const login = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const data = await UserService.loginUser(req.body);
-    res.status(200).json({ status: 'success', data });
-  } catch (err) { next(err); }
+    res.status(200).json({ status: "success", data });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const refresh = async (req: Request, res: Response, next: NextFunction) => {
+export const refresh = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const { refreshToken } = req.body;
-    if (!refreshToken) throw new ApiError(400, 'Refresh token is required');
+    if (!refreshToken) throw new ApiError(400, "Refresh token is required");
 
     const data = await UserService.refreshAccessToken(refreshToken);
-    res.status(200).json({ status: 'success', ...data });
-  } catch (err) { next(err); }
+    res.status(200).json({ status: "success", ...data });
+  } catch (err) {
+    next(err);
+  }
 };
 
-export const logout = async (req: Request, res: Response, next: NextFunction) => {
+export const logout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const { refreshToken } = req.body;
     await RefreshTokenModel.deleteOne({ token: refreshToken });
-    res.status(200).json({ status: 'success', message: 'Logged out successfully' });
-  } catch (err) { next(err); }
+    res
+      .status(200)
+      .json({ status: "success", message: "Logged out successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const registerAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { user, token } = await UserService.registerAdminWithShop(
+      req.body,
+    );
+
+    res.status(201).json({
+      status: "success",
+      token,
+      data: { user },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin creates an employee
+export const addEmployee = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await UserService.createEmployee(
+      req.body,
+      (req.user as any).shopId,
+    );
+
+    res.status(201).json({
+      status: "success",
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
