@@ -26,6 +26,7 @@ const returnSchema = new Schema<IReturnToSupplier>({
   creditReceived: { type: Number, required: true }
 }, { timestamps: true });
 
+supplierSchema.index({ name: 1, shopId: 1 }, { unique: true });
 supplierSchema.plugin(tenantPlugin);
 supplierPaymentSchema.plugin(tenantPlugin);
 returnSchema.plugin(tenantPlugin);
