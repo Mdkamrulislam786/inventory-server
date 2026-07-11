@@ -1,5 +1,6 @@
 import { SaleModel } from "../infrastructure/sale.model";
-import * as InventoryService from "../../inventory/application/inventory.service";
+import mongoose from "mongoose";
+import { deductStockFEFO } from "../../inventory/application/inventory.service";
 import { CheckoutPayload } from "../domain/sale.types";
 
 export const checkout = async (
@@ -7,45 +8,68 @@ export const checkout = async (
   payload: CheckoutPayload,
 ) => {
   const { cartItems, customerName } = payload;
-  let grandTotal = 0;
-  const processedItems = [];
 
-  // 1. Create Sale Record (to get the ID for linking)
-  const newSale = new SaleModel({
-    employeeId,
-    customerName,
-    items: [],
-    totalAmount: 0,
-  });
+  // Start Session for Atomicity
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  for (const item of cartItems) {
-    // 2. Inventory Service now handles everything related to stock + transactions
-    const deductionResult = await InventoryService.deductStockFEFO(
-      item.medicineId,
-      item.quantity,
-      newSale._id.toString(), // Link to this sale
-      employeeId,
-      item.manualPrice,
+  try {
+    let grandTotal = 0;
+    const processedItems = [];
+
+    // 1. Create Initial Sale Record
+    const [newSale] = await SaleModel.create(
+      [
+        {
+          employeeId,
+          customerName,
+          items: [], // Will populate later
+          totalAmount: 0,
+        },
+      ],
+      { session },
     );
 
-    const finalItemPrice = item.manualPrice ?? deductionResult.systemTotalPrice;
-    grandTotal += finalItemPrice;
+    // 2. Loop through cart and deduct stock
+    for (const item of cartItems) {
+      const deductionResult = await deductStockFEFO(
+        item.medicineId,
+        item.quantity,
+        newSale._id.toString(),
+        employeeId,
+        item.manualPrice,
+        session, // Pass the session down
+      );
 
-    processedItems.push({
-      medicineId: item.medicineId,
-      brandName: deductionResult.brandName,
-      quantity: item.quantity,
-      soldPrice: finalItemPrice,
-      isManualPrice: !!item.manualPrice,
-    });
+      const finalItemPrice =
+        item.manualPrice ?? deductionResult.systemTotalPrice;
+      grandTotal += finalItemPrice;
+
+      processedItems.push({
+        medicineId: item.medicineId,
+        brandName: deductionResult.brandName,
+        quantity: item.quantity,
+        soldPrice: finalItemPrice,
+        isManualPrice: !!item.manualPrice,
+      });
+    }
+
+    // 3. Update Sale total and final items atomically
+    newSale.items = processedItems as any;
+    newSale.totalAmount = grandTotal;
+    await newSale.save({ session });
+
+    // Commit Transaction
+    await session.commitTransaction();
+    return newSale;
+  } catch (err) {
+    // If anything fails, rollback everything (Stock, Sale record, Transactions)
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
   }
-
-  // 3. Update Sale total and final items
-  newSale.items = processedItems as any;
-  newSale.totalAmount = grandTotal;
-
-  return await newSale.save();
-};;
+};;;
 
 export const getSalesList = async (startDate: Date, endDate: Date) => {
   return await SaleModel.find({
