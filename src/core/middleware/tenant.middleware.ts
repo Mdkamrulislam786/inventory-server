@@ -6,9 +6,9 @@ export const setTenantContext = (
   res: Response,
   next: NextFunction,
 ) => {
-  const shopId = (req as any).user?.shopId;
+  const shopId = req.user?.shopId;
   if (!shopId) {
-    return next(new Error("No shop associated with this user"));
+    return next(new Error("Unauthorized: No shop associated with this user"));
   }
   tenantContext.run(shopId, () => next());
 };

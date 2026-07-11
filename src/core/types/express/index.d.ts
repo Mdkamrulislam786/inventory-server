@@ -1,13 +1,8 @@
-import { UserRole } from '../../../modules/user/domain/user.entity';
-import { Types } from 'mongoose';
-
+import { IUser } from "../modules/auth/domain/user.entity"; // Import your interface
 declare global {
   namespace Express {
     interface Request {
-      user: {
-        id: string;
-        role: UserRole;
-      };
+      user: IUser; // Now TypeScript knows req.user exists
     }
   }
 }
