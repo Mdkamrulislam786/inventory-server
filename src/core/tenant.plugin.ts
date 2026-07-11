@@ -8,7 +8,10 @@ export const tenantPlugin = (schema: any) => {
 
   schema.pre("save", async function (this: any) {
     const shopId = tenantContext.getStore();
-
+    console.log(
+      `[TenantPlugin Debug]: Querying ${this.constructor.modelName}. Current ShopID in Context:`,
+      shopId,
+    );
     if (!shopId) {
       throw new Error(
         `[TenantError]: Missing shopId context for ${this.constructor.modelName}. Is setTenantContext middleware active?`,

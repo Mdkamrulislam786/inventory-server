@@ -14,6 +14,7 @@ import {
   PaginatedResult,
 } from "../domain/inventory.entity";
 import mongoose from "mongoose";
+import { tenantContext } from "../../../core/tenant.context";
 
 /**
  * Admin: Add new stock (Stock-In)
@@ -161,6 +162,7 @@ export const getPaginatedStockList = async (
     // 1. Filter by search
     {
       $match: {
+        shopId: tenantContext.getStore(),
         $or: [
           { brandName: { $regex: search, $options: "i" } },
           { genericName: { $regex: search, $options: "i" } },
