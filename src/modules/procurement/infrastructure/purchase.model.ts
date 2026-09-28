@@ -1,4 +1,5 @@
 import { Schema, model, Types } from 'mongoose';
+import { tenantPlugin } from '../../../core/tenant.plugin';
 
 const purchaseItemSchema = new Schema({
   medicineId: { type: Schema.Types.ObjectId, ref: 'Medicine', required: true },
@@ -33,5 +34,6 @@ const purchaseSchema = new Schema({
 
 // Indexing for fast ledger lookups
 purchaseSchema.index({ supplierId: 1, createdAt: -1 });
+purchaseSchema.plugin(tenantPlugin);
 
 export const PurchaseModel = model('Purchase', purchaseSchema);

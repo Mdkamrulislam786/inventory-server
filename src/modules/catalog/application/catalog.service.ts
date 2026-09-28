@@ -46,59 +46,64 @@ export const createShelf = async (shelfTag: string, description?: string) => {
 };
 
 export const searchMedicines = async (searchTerm: string) => {
-  // 1. Find Medicines and Populate Shelf Details
+  // 1. Find Medicines (Scoped by tenantPlugin)
   const medicines = await MedicineModel.find({
     $or: [
       { brandName: { $regex: searchTerm, $options: "i" } },
       { genericName: { $regex: searchTerm, $options: "i" } },
     ],
   })
-    .populate("shelfId") // Joins the Shelf collection
-    .populate("manufacturerId", "name") // Optional: also grab Manufacturer name
+    .populate("shelfId")
+    .populate("manufacturerId", "name")
     .lean();
 
-  const results = [];
+  if (medicines.length === 0) return [];
 
-  for (const med of medicines) {
-    // 2. Get the latest active batch for pricing
-    const latestBatch = await BatchModel.findOne({
-      medicineId: med._id,
-      quantity: { $gt: 0 },
-      expiryDate: { $gt: new Date() },
-    }).sort({ expiryDate: 1 });
+  // Get all IDs to fetch batches in ONE query
+  const medicineIds = medicines.map((m) => m._id);
 
+  // 2. Fetch all valid batches for these medicines in ONE go
+  const allBatches = await BatchModel.find({
+    medicineId: { $in: medicineIds },
+    quantity: { $gt: 0 },
+    expiryDate: { $gt: new Date() },
+  })
+    .sort({ expiryDate: 1 })
+    .lean();
+
+  // 3. Map results (Process in memory, not in the DB)
+  return medicines.map((med) => {
+    // Find relevant batches for this specific medicine from our fetched list
+    const medBatches = allBatches.filter(
+      (b) => b.medicineId.toString() === med._id.toString(),
+    );
+    const latestBatch = medBatches[0]; // Since we sorted by expiryDate in the query, this is the earliest
+
+    const totalStock = medBatches.reduce(
+      (acc, b) => acc + (b.quantity || 0),
+      0,
+    );
+
+    // Pricing logic
     let displayPrice = 0;
-    let totalStock = 0;
     let priceUnit = "";
-
     if (latestBatch) {
-      // 3. Context-Aware Pricing Logic
-      if (
-        [BaseUnit.TABLET, BaseUnit.CAPSULE].includes(med.baseUnit as BaseUnit)
-      ) {
-        displayPrice = latestBatch.storePrice * latestBatch.unitsPerPackage;
+      if ([BaseUnit.TABLET, BaseUnit.CAPSULE].includes(med.baseUnit as any)) {
+        displayPrice =
+          latestBatch.storePrice * (latestBatch.unitsPerPackage || 1);
         priceUnit = "per strip";
       } else {
         displayPrice = latestBatch.storePrice;
         priceUnit = "per piece";
       }
-
-      // 4. Aggregate Stock
-      const allBatches = await BatchModel.find({
-        medicineId: med._id,
-        quantity: { $gt: 0 },
-      });
-      totalStock = allBatches.reduce((acc, b) => acc + b.quantity, 0);
     }
 
-    // 5. Build Final Object with Shelf Details
-    results.push({
+    return {
       id: med._id,
       brandName: med.brandName,
       genericName: med.genericName,
       baseUnit: med.baseUnit,
       manufacturer: med.manufacturerId,
-      // Added Shelf Details here
       shelfLocation: med.shelfId
         ? {
             tag: (med.shelfId as any).shelfTag,
@@ -114,11 +119,9 @@ export const searchMedicines = async (searchTerm: string) => {
             expiryDate: latestBatch.expiryDate,
           }
         : null,
-    });
-  }
-
-  return results;
-};;
+    };
+  });
+};
 
 /**
  * OCR Matching Logic

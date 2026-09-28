@@ -1,5 +1,6 @@
 import { Schema, model } from 'mongoose';
 import { IBatch, ITransaction } from '../domain/inventory.entity';
+import { tenantPlugin } from "../../../core/tenant.plugin";
 
 const batchSchema = new Schema<IBatch>({
   medicineId: { type: Schema.Types.ObjectId, ref: 'Medicine', required: true },
@@ -15,6 +16,7 @@ const batchSchema = new Schema<IBatch>({
 
 // FEFO Index: Find medicine, then sort by expiry
 batchSchema.index({ medicineId: 1, expiryDate: 1 });
+batchSchema.plugin(tenantPlugin);
 
 const transactionSchema = new Schema<ITransaction>({
   saleId: { type: Schema.Types.ObjectId, ref: 'Sale', default: null },
@@ -25,6 +27,7 @@ const transactionSchema = new Schema<ITransaction>({
   quantity: { type: Number, required: true },
   totalPrice: { type: Number, required: true }
 }, { timestamps: true });
+transactionSchema.plugin(tenantPlugin);
 
 export const BatchModel = model<IBatch>('Batch', batchSchema);
 export const TransactionModel = model<ITransaction>('Transaction', transactionSchema);

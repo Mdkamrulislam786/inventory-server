@@ -13,6 +13,8 @@ import {
   StockListResponse,
   PaginatedResult,
 } from "../domain/inventory.entity";
+import mongoose from "mongoose";
+import { tenantContext } from "../../../core/tenant.context";
 
 /**
  * Admin: Add new stock (Stock-In)
@@ -160,6 +162,7 @@ export const getPaginatedStockList = async (
     // 1. Filter by search
     {
       $match: {
+        shopId: tenantContext.getStore(),
         $or: [
           { brandName: { $regex: search, $options: "i" } },
           { genericName: { $regex: search, $options: "i" } },
@@ -258,66 +261,87 @@ export const getPaginatedStockList = async (
   };
 };
 
-
 export const deductStockFEFO = async (
-  medicineId: string, 
-  requestedQty: number, 
-  saleId: string, 
-  userId: string, 
-  manualPrice?: number
+  medicineId: string,
+  requestedQty: number,
+  saleId: string,
+  userId: string,
+  manualPrice: number | undefined,
+  session: mongoose.ClientSession, // MUST pass the session
 ) => {
-  const medicine = await MedicineModel.findById(medicineId);
+  // 1. Fetch Medicine
+  const medicine = await MedicineModel.findById(medicineId).session(session);
   if (!medicine) throw new Error("Medicine not found");
 
-  const batches = await BatchModel.find({
-    medicineId,
-    quantity: { $gt: 0 },
-    expiryDate: { $gt: new Date() }
-  }).sort({ expiryDate: 1 });
+  // 2. Fetch Batches (FEFO: Sort by expiry)
+  // The tenantPlugin handles scoping automatically via the context
+  const batches = await BatchModel.find(
+    {
+      medicineId,
+      quantity: { $gt: 0 },
+      expiryDate: { $gt: new Date() },
+    },
+    null,
+    { session },
+  ).sort({ expiryDate: 1 });
 
+  // 3. Validate Stock
   const available = batches.reduce((acc, b) => acc + b.quantity, 0);
-  if (available < requestedQty) throw new Error(`Stock out: ${medicine.brandName}`);
+  if (available < requestedQty) {
+    throw new Error(
+      `Insufficient stock for: ${medicine.brandName}. Available: ${available}`,
+    );
+  }
 
   let remaining = requestedQty;
   let systemTotalPrice = 0;
-  const batchesAffected = [];
 
+  // 4. Process Batches
   for (const batch of batches) {
     if (remaining <= 0) break;
+
     const take = Math.min(batch.quantity, remaining);
-    
-    // 1. Update Batch Quantity
-    batch.quantity -= take;
-    await batch.save();
 
-    // 2. Calculate Price for this specific movement
-    // Logic: If manualPrice exists for the whole item, we distribute it proportionally to the batch quantity
-    const batchCalculatedPrice = manualPrice 
-      ? (manualPrice * (take / requestedQty)) 
-      : (take * batch.storePrice);
+    // ATOMIC UPDATE: This prevents race conditions where 2 people buy the same item
+    await BatchModel.findByIdAndUpdate(
+      batch._id,
+      { $inc: { quantity: -take } },
+      { session, new: true },
+    );
 
-    systemTotalPrice += (take * batch.storePrice);
+    // Calculate Price for this specific movement
+    // If manualPrice exists, distribute proportionally
+    const batchCalculatedPrice = manualPrice
+      ? manualPrice * (take / requestedQty)
+      : take * batch.storePrice;
 
-    // 3. INTERNAL ENCAPSULATION: Create the Transaction record here
-    await TransactionModel.create({
-      saleId,
-      medicineId,
-      batchId: batch._id,
-      userId, // The employee making the sale
-      type: 'out',
-      quantity: take,
-      totalPrice: batchCalculatedPrice
-    });
+    systemTotalPrice += take * batch.storePrice;
 
-    batchesAffected.push({ batchId: batch._id, quantity: take });
+    // Create Transaction Record
+    await TransactionModel.create(
+      [
+        {
+          saleId,
+          medicineId,
+          batchId: batch._id,
+          userId,
+          type: "out",
+          quantity: take,
+          totalPrice: batchCalculatedPrice,
+          createdAt: new Date(),
+        },
+      ],
+      { session },
+    );
+
     remaining -= take;
   }
 
   return {
     brandName: medicine.brandName,
-    systemTotalPrice, // Still returning this so Sales can compare if needed
+    systemTotalPrice,
   };
-};
+};;
 
 export const searchMedicinesForSale = async (searchQuery: string) => {
   const terms = searchQuery.split(',').map(t => t.trim()).filter(t => t !== "");
